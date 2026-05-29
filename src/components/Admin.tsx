@@ -12,6 +12,7 @@ interface AdminProps {
   reels: Post[];
   registeredUsers: User[];
   onToggleUserVerification: (userId: string) => void;
+  onUpdateUserFollowers: (userId: string, followersCount: number) => void;
 }
 
 export default function Admin({
@@ -23,11 +24,13 @@ export default function Admin({
   onClearLogs,
   reels,
   registeredUsers,
-  onToggleUserVerification
+  onToggleUserVerification,
+  onUpdateUserFollowers
 }: AdminProps) {
   const [bannedUsers, setBannedUsers] = useState<string[]>([]);
   const [banInput, setBanInput] = useState("");
   const [systemAlert, setSystemAlert] = useState("Status do Servidor: Operando nominalmente 🟢");
+  const [followersInputs, setFollowersInputs] = useState<Record<string, string>>({});
 
   const handleBanSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +151,52 @@ export default function Admin({
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
+              <div className="mt-3.5 space-y-2 border-t border-dashed border-zinc-100 dark:border-zinc-800/80 pt-3">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-zinc-400 font-mono text-[9px] uppercase tracking-wider">Seguidores</span>
+                  <span className="font-mono font-bold text-violet-500 bg-violet-500/10 px-1.5 py-0.5 rounded text-[9px]">
+                    {userItem.followersCount} seg.
+                  </span>
+                </div>
+                <div className="flex gap-1.5 items-center">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder={`${userItem.followersCount}`}
+                    value={followersInputs[userItem.id] !== undefined ? followersInputs[userItem.id] : ""}
+                    onChange={(e) => setFollowersInputs({ ...followersInputs, [userItem.id]: e.target.value })}
+                    className="w-full bg-zinc-100 dark:bg-black py-1 px-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-900 dark:text-zinc-100 font-mono outline-none focus:border-violet-500/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inputVal = followersInputs[userItem.id];
+                      if (inputVal === undefined || inputVal.trim() === "") {
+                        alert("Por favor, digite um número de seguidores.");
+                        return;
+                      }
+                      const count = parseInt(inputVal);
+                      if (isNaN(count) || count < 0) {
+                        alert("Digite um número inteiro válido.");
+                        return;
+                      }
+                      onUpdateUserFollowers(userItem.id, count);
+                      alert(`✓ Seguidores de @${userItem.username} atualizados para ${count}!`);
+                      setFollowersInputs((prev) => {
+                        const updated = { ...prev };
+                        delete updated[userItem.id];
+                        return updated;
+                      });
+                    }}
+                    className="py-1 px-2 bg-violet-600 hover:bg-violet-500 text-white font-black text-[9px] rounded-lg uppercase tracking-wider transition active:scale-[0.96] shrink-0 cursor-pointer"
+                    id={`btn-save-followers-${userItem.username}`}
+                  >
+                    Gravar
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
                 <span className="text-[9px] uppercase font-mono font-bold text-zinc-400">
                   {userItem.isVerified ? "🔒 Verificado" : "❌ S/ Selo"}
                 </span>

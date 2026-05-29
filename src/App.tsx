@@ -45,13 +45,25 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem("aura_is_logged_in") === "true";
+  });
   
   // Current active navigation tab
   const [activeTab, setActiveTab] = useState<"feed" | "explore" | "reels" | "publish" | "chat" | "marketplace" | "notifications" | "profile" | "admin">("feed");
 
   // Global Core Data states
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USER);
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    const storedUser = localStorage.getItem("aura_user_info");
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch (err) {
+        console.error("Failed to parse aura_user_info:", err);
+      }
+    }
+    return INITIAL_USER;
+  });
   const [stories, setStories] = useState<Story[]>(INITIAL_STORIES);
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [reels, setReels] = useState<Post[]>(INITIAL_REELS);
@@ -59,54 +71,64 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
 
   // Users register for Admin verification choice & sync
-  const [registeredUsers, setRegisteredUsers] = useState<User[]>([
-    {
-      ...INITIAL_USER,
-      id: "user_me",
-    },
-    {
-      id: "user_alice",
-      username: "alice_design",
-      displayName: "Alice Ferreira",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
-      bio: "Visual designer creating the next generation of visual arts on the web! 🚀",
-      website: "alice_design.concept",
-      followersCount: 840,
-      followingCount: 120,
-      isVerified: true,
-      isCreator: true,
-      walletBalance: 120.00,
-      role: "creator"
-    },
-    {
-      id: "user_bruno",
-      username: "bruno_dev",
-      displayName: "Bruno Tech",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
-      bio: "Software architect and backend builder. Focused on performance and cloud scalability.",
-      website: "brunotech.dev",
-      followersCount: 520,
-      followingCount: 95,
-      isVerified: false,
-      isCreator: true,
-      walletBalance: 80.00,
-      role: "creator"
-    },
-    {
-      id: "user_clara",
-      username: "clara_art",
-      displayName: "Clara G.",
-      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&h=150&q=80",
-      bio: "Contemporary artist exploring digital painting and interactive physical canvases. 🎨✨",
-      website: "clara_art.studio",
-      followersCount: 1290,
-      followingCount: 220,
-      isVerified: true,
-      isCreator: true,
-      walletBalance: 450.00,
-      role: "creator"
+  const [registeredUsers, setRegisteredUsers] = useState<User[]>(() => {
+    const stored = localStorage.getItem("aura_registered_users");
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (err) {
+        console.error("Failed to parse aura_registered_users:", err);
+      }
     }
-  ]);
+    return [
+      {
+        ...INITIAL_USER,
+        id: "user_me",
+      },
+      {
+        id: "user_alice",
+        username: "alice_design",
+        displayName: "Alice Ferreira",
+        avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
+        bio: "Visual designer creating the next generation of visual arts on the web! 🚀",
+        website: "alice_design.concept",
+        followersCount: 840,
+        followingCount: 120,
+        isVerified: true,
+        isCreator: true,
+        walletBalance: 120.00,
+        role: "creator"
+      },
+      {
+        id: "user_bruno",
+        username: "bruno_dev",
+        displayName: "Bruno Tech",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
+        bio: "Software architect and backend builder. Focused on performance and cloud scalability.",
+        website: "brunotech.dev",
+        followersCount: 520,
+        followingCount: 95,
+        isVerified: false,
+        isCreator: true,
+        walletBalance: 80.00,
+        role: "creator"
+      },
+      {
+        id: "user_clara",
+        username: "clara_art",
+        displayName: "Clara G.",
+        avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&h=150&q=80",
+        bio: "Contemporary artist exploring digital painting and interactive physical canvases. 🎨✨",
+        website: "clara_art.studio",
+        followersCount: 1290,
+        followingCount: 220,
+        isVerified: true,
+        isCreator: true,
+        walletBalance: 450.00,
+        role: "creator"
+      }
+    ];
+  });
 
   // Real-time Incoming Chat Message Toast banner state
   const [activeToast, setActiveToast] = useState<{ displayName: string; text: string; avatar: string } | null>(null);
@@ -146,6 +168,17 @@ export default function App() {
       setCurrentUser((prev) => {
         const updated = { ...prev, stripeAccountId: stripeAccountIdParam };
         localStorage.setItem("aura_user_info", JSON.stringify(updated));
+        
+        // Also update registeredUsers right away
+        setRegisteredUsers((prevUsers) =>
+          prevUsers.map((u) => {
+            if (u.id === "user_me" || u.username === updated.username) {
+              return { ...u, stripeAccountId: stripeAccountIdParam };
+            }
+            return u;
+          })
+        );
+
         return updated;
       });
       
@@ -299,6 +332,11 @@ export default function App() {
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  // Keep registeredUsers persistent in localStorage
+  useEffect(() => {
+    localStorage.setItem("aura_registered_users", JSON.stringify(registeredUsers));
+  }, [registeredUsers]);
+
   // Skip splash check
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -308,7 +346,17 @@ export default function App() {
       setIsLoggedIn(true);
       const storedUser = localStorage.getItem("aura_user_info");
       if (storedUser) {
-        setCurrentUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        setCurrentUser(parsed);
+        // Sync user into registered users list
+        setRegisteredUsers((prev) =>
+          prev.map((u) => {
+            if (u.id === "user_me" || u.username === parsed.username) {
+              return { ...u, ...parsed };
+            }
+            return u;
+          })
+        );
       }
     } else {
       setShowOnboarding(true);
@@ -331,6 +379,15 @@ export default function App() {
     setShowAuth(false);
     localStorage.setItem("aura_is_logged_in", "true");
     localStorage.setItem("aura_user_info", JSON.stringify(updatedUser));
+    // Also sync standard logged-in user in registeredUsers
+    setRegisteredUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === "user_me" || u.username === updatedUser.username) {
+          return { ...u, ...updatedUser };
+        }
+        return u;
+      })
+    );
     addAuditLog("USER_SIGN_IN", `Sessão JWT Segura Ativada - Função: ${updatedUser.role.toUpperCase()}`);
   };
 
@@ -620,6 +677,17 @@ export default function App() {
     }
   };
 
+  const handleDisconnectStripeAccount = () => {
+    setCurrentUser((prev) => {
+      const updated = { ...prev };
+      delete updated.stripeAccountId;
+      localStorage.setItem("aura_user_info", JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog("STRIPE_CONNECT_DISCONNECTED", "Conta Stripe Connect desconectada manualmente pelo criador.");
+    alert("🔌 Sua conta Stripe Connect foi desvinculada com sucesso do seu perfil.");
+  };
+
   const handleBuyVerification = () => {
     if (currentUser.walletBalance < 19.90) {
       alert("⚠️ Carteira insuficiente para comprar selo azul! Recarregue primeiro.");
@@ -749,6 +817,32 @@ export default function App() {
     );
 
     addAuditLog("TOGGLE_USER_VERIFICATION", `Selo verificado de @${targetUsername || userId} alterado para: ${targetVerified ? "Ativo 🔒" : "Inativo"}`);
+  };
+
+  const handleUpdateUserFollowers = (userId: string, count: number) => {
+    let targetUsername = "";
+
+    // 1. Update in registeredUsers list
+    setRegisteredUsers((prevUsers) =>
+      prevUsers.map((u) => {
+        if (u.id === userId) {
+          targetUsername = u.username;
+          return { ...u, followersCount: count };
+        }
+        return u;
+      })
+    );
+
+    // 2. If corresponding to logged-in user, sync
+    if (userId === "user_me" || userId === currentUser.id) {
+      setCurrentUser((prev) => {
+        const updated = { ...prev, followersCount: count };
+        localStorage.setItem("aura_user_info", JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    addAuditLog("ADMIN_UPDATE_FOLLOWERS", `Seguidores de @${targetUsername || userId} alterados para ${count}.`);
   };
 
   // Content Upload distribution router
@@ -1026,6 +1120,7 @@ export default function App() {
             onUpdateAvatar={handleUpdateAvatar}
             onWithdrawFunds={handleWithdrawFunds}
             onConnectStripeAccount={handleConnectStripeAccount}
+            onDisconnectStripeAccount={handleDisconnectStripeAccount}
           />
         )}
 
@@ -1040,6 +1135,7 @@ export default function App() {
             reels={reels}
             registeredUsers={registeredUsers}
             onToggleUserVerification={handleToggleUserVerification}
+            onUpdateUserFollowers={handleUpdateUserFollowers}
           />
         )}
       </main>
