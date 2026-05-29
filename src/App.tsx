@@ -418,25 +418,33 @@ export default function App() {
     addAuditLog("SEND_DIRECT_MESSAGE", `Canal de Chat: ${channelId}`);
   };
 
-  const handleAddChannel = (username: string) => {
-    // If channel exists, proceed
-    const exists = chats.find((c) => c.partner.username === username);
+  const handleAddChannel = (usernameOrUser: string | User) => {
+    const isObject = typeof usernameOrUser !== "string";
+    const targetUsername = isObject ? usernameOrUser.username : usernameOrUser.toLowerCase().replace("@", "");
+    
+    // If channel already exists, exit
+    const exists = chats.find((c) => c.partner.username === targetUsername);
     if (exists) return;
+
+    // Find the real user from registeredUsers
+    const realUserCandidate = isObject 
+      ? usernameOrUser 
+      : registeredUsers.find((u) => u.username.toLowerCase() === targetUsername);
 
     const newChannel: ChatChannel = {
       id: `chat_${Math.random().toString()}`,
       partner: {
-        id: `user_${Math.random()}`,
-        username,
-        displayName: username.toUpperCase(),
-        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80",
+        id: realUserCandidate?.id || `user_${Math.random()}`,
+        username: targetUsername,
+        displayName: realUserCandidate?.displayName || targetUsername.toUpperCase(),
+        avatar: realUserCandidate?.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80",
         isOnline: true,
       },
       messages: [],
       unreadCount: 0,
     };
     setChats((prev) => [newChannel, ...prev]);
-    addAuditLog("CREATE_CHAT_CHANNEL", `Iniciado chat direto com @${username}`);
+    addAuditLog("CREATE_CHAT_CHANNEL", `Iniciado chat direto com @${targetUsername}`);
   };
 
   // Creators monetization tipping & wallet addition PIX
@@ -905,6 +913,7 @@ export default function App() {
             currentUser={currentUser}
             onSendMessage={handleSendMessage}
             onAddChannel={handleAddChannel}
+            registeredUsers={registeredUsers}
           />
         )}
 
