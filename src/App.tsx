@@ -369,10 +369,10 @@ export default function App() {
   };
 
   const handleLogin = (user: User) => {
-    // If username is joaopedro, enforce admin role status!
+    // If user logged in as the specific email, grant admin role status!
     const updatedUser = {
       ...user,
-      role: (user.username === "joaopedro" ? "admin" : (user.role || "creator")) as 'user' | 'creator' | 'admin'
+      role: (user.email === "joaopedromoladeoliveira@gmail.com" ? "admin" : "creator") as 'user' | 'creator' | 'admin'
     };
     setCurrentUser(updatedUser);
     setIsLoggedIn(true);

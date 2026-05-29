@@ -12,6 +12,7 @@ export interface User {
   walletBalance: number;
   role: 'user' | 'creator' | 'admin';
   stripeAccountId?: string;
+  email?: string;
 }
 
 export type PostType = 'image' | 'video' | 'carousel' | 'file';

@@ -10,8 +10,8 @@ interface AuthProps {
 
 export default function Auth({ onLogin }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("joaopedromoladeoliveira@gmail.com");
-  const [password, setPassword] = useState("Pedro12@");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -26,7 +26,13 @@ export default function Auth({ onLogin }: AuthProps) {
     setError("");
 
     if (smsMode) {
-      onLogin(INITIAL_USER);
+      onLogin({
+        ...INITIAL_USER,
+        username: "aura_tester",
+        displayName: "Testador Aura",
+        email: "teste@aura.social",
+        role: "creator"
+      });
       return;
     }
 
@@ -35,19 +41,33 @@ export default function Auth({ onLogin }: AuthProps) {
         setError("E-mail ou senha incorretos.");
         return;
       }
-      onLogin(INITIAL_USER);
+      onLogin({
+        ...INITIAL_USER,
+        email: "joaopedromoladeoliveira@gmail.com",
+        username: "joaopedro",
+        displayName: "João Pedro",
+        role: "admin"
+      });
     } else {
       const customUser: User = {
         ...INITIAL_USER,
-        username: username ? username.toLowerCase().trim() : INITIAL_USER.username,
-        displayName: displayName.trim() || INITIAL_USER.displayName,
+        email: email.trim().toLowerCase(),
+        username: username ? username.toLowerCase().trim() : "novo_criador",
+        displayName: displayName.trim() || "Novo Criador Aura",
+        role: "creator"
       };
       onLogin(customUser);
     }
   };
 
   const handleShortcutLogin = () => {
-    onLogin(INITIAL_USER);
+    onLogin({
+      ...INITIAL_USER,
+      username: "aura_tester",
+      displayName: "Testador Aura",
+      email: "teste@aura.social",
+      role: "creator"
+    });
   };
 
   return (
