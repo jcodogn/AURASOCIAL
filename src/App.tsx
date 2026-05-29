@@ -75,7 +75,10 @@ export default function App() {
     const stored = localStorage.getItem("aura_registered_users");
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(u => u.username !== "alice_design" && u.username !== "bruno_dev" && u.username !== "clara_art");
+        }
       } catch (err) {
         console.error("Failed to parse aura_registered_users:", err);
       }
@@ -84,48 +87,6 @@ export default function App() {
       {
         ...INITIAL_USER,
         id: "user_me",
-      },
-      {
-        id: "user_alice",
-        username: "alice_design",
-        displayName: "Alice Ferreira",
-        avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
-        bio: "Visual designer creating the next generation of visual arts on the web! 🚀",
-        website: "alice_design.concept",
-        followersCount: 840,
-        followingCount: 120,
-        isVerified: true,
-        isCreator: true,
-        walletBalance: 120.00,
-        role: "creator"
-      },
-      {
-        id: "user_bruno",
-        username: "bruno_dev",
-        displayName: "Bruno Tech",
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
-        bio: "Software architect and backend builder. Focused on performance and cloud scalability.",
-        website: "brunotech.dev",
-        followersCount: 520,
-        followingCount: 95,
-        isVerified: false,
-        isCreator: true,
-        walletBalance: 80.00,
-        role: "creator"
-      },
-      {
-        id: "user_clara",
-        username: "clara_art",
-        displayName: "Clara G.",
-        avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&h=150&q=80",
-        bio: "Contemporary artist exploring digital painting and interactive physical canvases. 🎨✨",
-        website: "clara_art.studio",
-        followersCount: 1290,
-        followingCount: 220,
-        isVerified: true,
-        isCreator: true,
-        walletBalance: 450.00,
-        role: "creator"
       }
     ];
   });
@@ -150,6 +111,7 @@ export default function App() {
   // AI sorting state
   const [aiSorted, setAiSorted] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
+  const [dbLoaded, setDbLoaded] = useState(false);
 
   // Check for Stripe Connect onboarding callbacks or checkout parameters
   useEffect(() => {
@@ -332,10 +294,94 @@ export default function App() {
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
-  // Keep registeredUsers persistent in localStorage
+  // Database loading on startup and initialization if empty
   useEffect(() => {
-    localStorage.setItem("aura_registered_users", JSON.stringify(registeredUsers));
-  }, [registeredUsers]);
+    const initDb = async () => {
+      try {
+        const res = await fetch("/api/db");
+        const resData = await res.json();
+        if (resData.initialized) {
+          // Overwrite client states with loaded database state
+          if (resData.data.registeredUsers) {
+            const filtered = resData.data.registeredUsers.filter(
+              (u: any) => u.username !== "alice_design" && u.username !== "bruno_dev" && u.username !== "clara_art"
+            );
+            setRegisteredUsers(filtered);
+          }
+          if (resData.data.stories) setStories(resData.data.stories);
+          if (resData.data.posts) setPosts(resData.data.posts);
+          if (resData.data.reels) setReels(resData.data.reels);
+          if (resData.data.chats) setChats(resData.data.chats);
+          if (resData.data.notifications) setNotifications(resData.data.notifications);
+          if (resData.data.auditLogs) setAuditLogs(resData.data.auditLogs);
+          
+          // Sync currentUser if they are logged in
+          const storedUser = localStorage.getItem("aura_user_info");
+          if (storedUser) {
+            const parsed = JSON.parse(storedUser);
+            const matchedUser = resData.data.registeredUsers.find(
+              (u: any) => u.username === parsed.username || u.id === parsed.id || u.email === parsed.email
+            );
+            if (matchedUser) {
+              setCurrentUser(matchedUser);
+              localStorage.setItem("aura_user_info", JSON.stringify(matchedUser));
+            }
+          }
+        } else {
+          // Initialize empty server database with current seed lists
+          await fetch("/api/db/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              registeredUsers,
+              stories,
+              posts,
+              reels,
+              chats,
+              notifications,
+              auditLogs
+            })
+          });
+        }
+      } catch (err) {
+        console.error("Erro ao inicializar conexão com o banco de dados:", err);
+      } finally {
+        setDbLoaded(true);
+      }
+    };
+    initDb();
+  }, []);
+
+  // Sync client state updates to the server database with simple debouncing
+  useEffect(() => {
+    if (!dbLoaded) return;
+
+    const saveToDb = async () => {
+      try {
+        await fetch("/api/db/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            registeredUsers,
+            stories,
+            posts,
+            reels,
+            chats,
+            notifications,
+            auditLogs
+          })
+        });
+      } catch (err) {
+        console.error("Erro ao salvar alterações no banco de dados:", err);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      saveToDb();
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [dbLoaded, registeredUsers, stories, posts, reels, chats, notifications, auditLogs]);
 
   // Skip splash check
   const handleSplashComplete = () => {
@@ -1048,9 +1094,15 @@ export default function App() {
         {activeTab === "explore" && (
           <Explore
             posts={posts}
+            registeredUsers={registeredUsers}
+            currentUser={currentUser}
             onSelectHashtag={(tag) => {
               setActiveTab("feed");
               handleSmartAISort(); // sort or filter simulation
+            }}
+            onStartChat={(user) => {
+              handleAddChannel(user);
+              setActiveTab("chat");
             }}
           />
         )}

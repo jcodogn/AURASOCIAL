@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -35,6 +36,82 @@ async function startServer() {
   // API Route - Health Check
   app.get("/api/health", (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
+  });
+
+  const DB_PATH = path.join(process.cwd(), "database.json");
+
+  // Helper to load db
+  const loadDatabase = () => {
+    if (!fs.existsSync(DB_PATH)) {
+      return null;
+    }
+    try {
+      const data = fs.readFileSync(DB_PATH, "utf-8");
+      return JSON.parse(data);
+    } catch (err) {
+      console.error("Failed to read database.json:", err);
+      return null;
+    }
+  };
+
+  // Helper to save db
+  const saveDatabase = (data: any) => {
+    try {
+      fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+      return true;
+    } catch (err) {
+      console.error("Failed to write database.json:", err);
+      return false;
+    }
+  };
+
+  // Get full database
+  app.get("/api/db", (req, res) => {
+    const dbData = loadDatabase();
+    if (!dbData) {
+      return res.json({ initialized: false });
+    }
+    res.json({ initialized: true, data: dbData });
+  });
+
+  // Init database
+  app.post("/api/db/init", (req, res) => {
+    const { registeredUsers, stories, posts, reels, chats, notifications, auditLogs } = req.body;
+    const initialDb = {
+      registeredUsers: registeredUsers || [],
+      stories: stories || [],
+      posts: posts || [],
+      reels: reels || [],
+      chats: chats || [],
+      notifications: notifications || [],
+      auditLogs: auditLogs || []
+    };
+    saveDatabase(initialDb);
+    res.json({ success: true, message: "Banco de dados inicializado com sucesso!" });
+  });
+
+  // Save changes to database
+  app.post("/api/db/save", (req, res) => {
+    const { registeredUsers, stories, posts, reels, chats, notifications, auditLogs } = req.body;
+    
+    const currentDb = loadDatabase() || {};
+    const updatedDb = {
+      ...currentDb,
+      ...(registeredUsers && { registeredUsers }),
+      ...(stories && { stories }),
+      ...(posts && { posts }),
+      ...(reels && { reels }),
+      ...(chats && { chats }),
+      ...(notifications && { notifications }),
+      ...(auditLogs && { auditLogs })
+    };
+    
+    const success = saveDatabase(updatedDb);
+    if (success) {
+      res.json({ success: true, message: "Banco de dados atualizado com sucesso!" });
+    } else {
+      res.status(500).json({ error: "Erro ao atualizar banco de dados no disco." });
+    }
   });
 
   // API Route - Intelligent Gemini Suggestion for Captions & Hashtags

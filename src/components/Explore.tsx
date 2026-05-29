@@ -1,15 +1,19 @@
 import React, { useState } from "react";
-import { Post } from "../types";
-import { Search, Sparkles, TrendingUp, Compass, Grid, Laptop, Flame, Award } from "lucide-react";
+import { Post, User } from "../types";
+import { Search, Sparkles, TrendingUp, Compass, Grid, Laptop, Flame, Award, MessageSquare, CheckCircle2 } from "lucide-react";
 
 interface ExploreProps {
   posts: Post[];
+  registeredUsers: User[];
+  currentUser: User;
   onSelectHashtag: (tag: string) => void;
+  onStartChat: (user: User) => void;
 }
 
-export default function Explore({ posts, onSelectHashtag }: ExploreProps) {
+export default function Explore({ posts, registeredUsers, currentUser, onSelectHashtag, onStartChat }: ExploreProps) {
   const [query, setQuery] = useState("");
 
+  // Filter posts based on search query
   const filteredPosts = posts.filter((post) => {
     return (
       post.caption.toLowerCase().includes(query.toLowerCase()) ||
@@ -17,6 +21,25 @@ export default function Explore({ posts, onSelectHashtag }: ExploreProps) {
       post.hashtags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()))
     );
   });
+
+  // Filter actual registered platform users based on search, strictly excluding fictitious seed users
+  const filteredUsers = query.trim()
+    ? registeredUsers.filter((u) => {
+        const isFictitious =
+          u.username === "alice_design" ||
+          u.username === "bruno_dev" ||
+          u.username === "clara_art";
+        if (isFictitious) return false;
+        
+        const term = query.toLowerCase();
+        return (
+          u.username.toLowerCase().includes(term) ||
+          (u.displayName || "").toLowerCase().includes(term) ||
+          (u.email || "").toLowerCase().includes(term) ||
+          (u.bio || "").toLowerCase().includes(term)
+        );
+      })
+    : [];
 
   const popularTrends = [
     { tag: "minimalismo", count: "142 mil posts", icon: Compass },
@@ -33,10 +56,10 @@ export default function Explore({ posts, onSelectHashtag }: ExploreProps) {
           <Search className="absolute left-4 top-3.5 w-5 h-5 text-zinc-400" />
           <input
             type="text"
-            placeholder="Pesquisar usuários, hashtags virais ou temas..."
+            placeholder="Pesquisar usuários reais na plataforma, hashtags ou temas..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full h-12 bg-zinc-50 dark:bg-zinc-90 w-full rounded-2xl pl-12 pr-4 text-xs font-semibold border border-zinc-200/60 dark:border-zinc-800 focus:border-violet-500 outline-none transition"
+            className="w-full h-12 bg-zinc-50 dark:bg-zinc-900 rounded-2xl pl-12 pr-4 text-xs font-semibold border border-zinc-200/60 dark:border-zinc-800 focus:border-violet-500 outline-none transition"
             id="input-search-explore"
           />
         </div>
@@ -44,46 +67,117 @@ export default function Explore({ posts, onSelectHashtag }: ExploreProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left 2 block layouts: search results or visual feed grids */}
-        <div className="md:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-wider block">Resultados em Destaque</span>
-            {query && (
-              <span className="text-xs text-zinc-550 dark:text-zinc-400 font-medium">
-                Encontrados {filteredPosts.length} itens correspondentes
-              </span>
-            )}
-          </div>
+        <div className="md:col-span-2 space-y-6">
+          
+          {/* 1. REAL USERS SEARCH RESULTS */}
+          {query.trim() !== "" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-wider block">
+                  Usuários na Plataforma ({filteredUsers.length})
+                </span>
+                <span className="text-[9px] text-zinc-400">Excluindo contas fictícias</span>
+              </div>
 
-          {filteredPosts.length === 0 ? (
-            <div className="text-center py-12 bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl p-6">
-              <Search className="w-10 h-10 text-zinc-400 mx-auto mb-2 stroke-1" />
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 font-semibold">Nenhuma correspondência</p>
-              <p className="text-[11px] text-zinc-400 mt-0.5">Tente usar outros termos como "design" ou "TS".</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className="relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 group border border-zinc-805 cursor-pointer"
-                  onClick={() => onSelectHashtag(post.hashtags[0] || "")}
-                  title="Clique para filtrar hashtag correspondente!"
-                >
-                  <img
-                    src={post.media[0]}
-                    alt={post.caption}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {/* Subtle info label on hover */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end text-white text-left">
-                    <span className="text-[10px] font-bold">@{post.username}</span>
-                    <span className="text-[9px] text-zinc-300 truncate mt-0.5">{post.caption}</span>
-                  </div>
+              {filteredUsers.length === 0 ? (
+                <div className="py-6 px-4 text-center rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-100 dark:border-zinc-900">
+                  <p className="text-xs text-zinc-550 dark:text-zinc-400">Nenhum usuário real encontrado com "{query}"</p>
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-2">
+                  {filteredUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-3.5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-900 shadow-sm hover:border-violet-500/35 transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${user.username}`}
+                          alt={user.displayName || user.username}
+                          referrerPolicy="no-referrer"
+                          className="w-10 h-10 rounded-xl object-cover border border-zinc-205/60 bg-zinc-100 shrink-0"
+                        />
+                        <div className="min-w-0 text-left">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">
+                              {user.displayName || user.username}
+                            </span>
+                            {user.role === "admin" && (
+                              <span className="text-[9px] bg-red-500/10 text-red-500 px-1 py-0.2 rounded font-mono font-black">
+                                ADMIN
+                              </span>
+                            )}
+                            {user.isVerified && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            )}
+                          </div>
+                          <span className="text-[10.5px] text-zinc-400 font-mono block">
+                            @{user.username}
+                          </span>
+                          {user.bio && (
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5 line-clamp-1 max-w-sm">
+                              {user.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {currentUser.username !== user.username && (
+                        <button
+                          onClick={() => onStartChat(user)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10.5px] font-bold transition shrink-0"
+                          title="Iniciar conversa com este usuário"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Mandar Mensagem</span>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
+
+          {/* 2. POSTS SEARCH RESULTS */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-wider block">
+                {query ? "Publicações Relacionadas" : "Explorar Tendências"} ({filteredPosts.length})
+              </span>
+            </div>
+
+            {filteredPosts.length === 0 ? (
+              <div className="text-center py-12 bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl p-6">
+                <Search className="w-10 h-10 text-zinc-400 mx-auto mb-2 stroke-1" />
+                <p className="text-xs text-zinc-650 dark:text-zinc-400 font-semibold">Nenhuma correspondência visual</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Tente usar outros termos como "design" ou "TS".</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {filteredPosts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 group border border-zinc-850 cursor-pointer shadow-sm"
+                    onClick={() => onSelectHashtag(post.hashtags[0] || "")}
+                    title="Clique para filtrar correspondências no feed!"
+                  >
+                    <img
+                      src={post.media[0]}
+                      alt={post.caption}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* Subtle info label on hover */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end text-white text-left">
+                      <span className="text-[10px] font-bold">@{post.username}</span>
+                      <span className="text-[9px] text-zinc-300 truncate mt-0.5">{post.caption}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right 1 layout side block: trending hashtags widgets */}
