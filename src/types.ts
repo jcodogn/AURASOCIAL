@@ -11,6 +11,7 @@ export interface User {
   isCreator: boolean;
   walletBalance: number;
   role: 'user' | 'creator' | 'admin';
+  stripeAccountId?: string;
 }
 
 export type PostType = 'image' | 'video' | 'carousel' | 'file';

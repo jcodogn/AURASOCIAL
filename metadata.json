@@ -1,0 +1,11 @@
+{
+  "name": "Aura Social",
+  "description": "Rede social premium com monetização por Stripe e busca de perfis pelo Supabase.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

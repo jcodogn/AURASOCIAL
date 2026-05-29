@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "./index.css";
 import { motion, AnimatePresence } from "motion/react";
 import Splash from "./components/Splash";
 import Onboarding from "./components/Onboarding";
@@ -127,6 +128,45 @@ export default function App() {
   // AI sorting state
   const [aiSorted, setAiSorted] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
+
+  // Check for Stripe Connect onboarding callbacks or checkout parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const onboardingStatus = params.get("stripe_onboarding");
+    const stripeAccountIdParam = params.get("stripe_account_id");
+    const stripeSuccess = params.get("stripe_success");
+    const amountParam = params.get("amount");
+
+    if (onboardingStatus === "success" && stripeAccountIdParam) {
+      // Clear query params elegantly to avoid loop
+      const cleanerUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanerUrl);
+
+      // Link onboarding account id!
+      setCurrentUser((prev) => {
+        const updated = { ...prev, stripeAccountId: stripeAccountIdParam };
+        localStorage.setItem("aura_user_info", JSON.stringify(updated));
+        return updated;
+      });
+      
+      alert(`🎉 [Stripe Connect] Conta vinculada com sucesso! Seu ID é: ${stripeAccountIdParam}. Seu canal está 100% pronto para receber saques reais.`);
+      addAuditLog("STRIPE_CONNECT_LINKED", `Conta Connect vinculada com sucesso: ${stripeAccountIdParam}`);
+    } else if (stripeSuccess === "true" && amountParam) {
+      const cleanerUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanerUrl);
+
+      const value = parseFloat(amountParam);
+      if (!isNaN(value)) {
+        setCurrentUser((prev) => {
+          const updated = { ...prev, walletBalance: prev.walletBalance + value };
+          localStorage.setItem("aura_user_info", JSON.stringify(updated));
+          return updated;
+        });
+        alert(`💰 [Stripe] Depósito de R$ ${value.toFixed(2)} foi processado e creditado via Checkout com sucesso!`);
+        addAuditLog("DEPOSIT_CREDITED", `Depósito Stripe Checkout Creditado: R$ ${value.toFixed(2)}`);
+      }
+    }
+  }, []);
 
   // Sync index.css dark class
   useEffect(() => {
@@ -544,6 +584,42 @@ export default function App() {
     }
   };
 
+  const handleConnectStripeAccount = async () => {
+    try {
+      const res = await fetch("/api/stripe/connect/account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUser.username,
+          email: `${currentUser.username}@example.com`
+        })
+      });
+      if (!res.ok) {
+        throw new Error("Erro de resposta do servidor de onboarding.");
+      }
+      const data = await res.json();
+      if (data.url) {
+        if (data.url === "SIMULATION_ONBOARDING") {
+          // Under simulation fallback
+          alert(`✨ [Simulador Stripe Connect] Nova conta gerada: ${data.id}. Vinculando perfil de testes.`);
+          
+          setCurrentUser((prev) => {
+            const updated = { ...prev, stripeAccountId: data.id };
+            localStorage.setItem("aura_user_info", JSON.stringify(updated));
+            return updated;
+          });
+          addAuditLog("STRIPE_CONNECT_ONBOARD", `Conta Conectada criada via simulação: ${data.id}`);
+        } else {
+          // Redirect the user to real Stripe Connect Express onboarding flow!
+          window.location.href = data.url;
+        }
+      }
+    } catch (err: any) {
+      console.error("Erro ao conectar com o Stripe:", err);
+      alert("⚠️ Erro de gateway Connect do Stripe: verifique o console do servidor.");
+    }
+  };
+
   const handleBuyVerification = () => {
     if (currentUser.walletBalance < 19.90) {
       alert("⚠️ Carteira insuficiente para comprar selo azul! Recarregue primeiro.");
@@ -949,6 +1025,7 @@ export default function App() {
             onBuyVerification={handleBuyVerification}
             onUpdateAvatar={handleUpdateAvatar}
             onWithdrawFunds={handleWithdrawFunds}
+            onConnectStripeAccount={handleConnectStripeAccount}
           />
         )}
 

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { User, Post } from "../types";
-import { Grid, Bookmark, Coins, BadgeCheck, FileText, Globe, LogOut, ArrowRight, Wallet, Check, Settings, Shield, Camera, ArrowUpRight, HelpCircle } from "lucide-react";
+import { Grid, Bookmark, Coins, BadgeCheck, FileText, Globe, LogOut, ArrowRight, Wallet, Check, Settings, Shield, Camera, ArrowUpRight, HelpCircle, Sparkles } from "lucide-react";
 
 interface ProfileProps {
   user: User;
@@ -12,6 +12,7 @@ interface ProfileProps {
   onBuyVerification: () => void;
   onUpdateAvatar: (avatarBase64: string) => void;
   onWithdrawFunds: (amount: number, bankAccount: string, stripeAccountId?: string) => Promise<any>;
+  onConnectStripeAccount?: () => Promise<any>;
 }
 
 export default function Profile({
@@ -23,7 +24,8 @@ export default function Profile({
   onAddFunds,
   onBuyVerification,
   onUpdateAvatar,
-  onWithdrawFunds
+  onWithdrawFunds,
+  onConnectStripeAccount
 }: ProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editBio, setEditBio] = useState(user.bio);
@@ -37,9 +39,15 @@ export default function Profile({
   const [walletMode, setWalletMode] = useState<"deposit" | "withdraw">("deposit");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawDestination, setWithdrawDestination] = useState("");
-  const [stripeAccountId, setStripeAccountId] = useState("");
+  const [stripeAccountId, setStripeAccountId] = useState(user.stripeAccountId || "");
   const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    if (user.stripeAccountId) {
+      setStripeAccountId(user.stripeAccountId);
+    }
+  }, [user.stripeAccountId]);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,48 +371,77 @@ export default function Profile({
 
             {!withdrawSuccess && walletMode === "withdraw" && (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center gap-1 bg-black/65 p-1 px-2 rounded-xl border border-zinc-800">
-                    <span className="text-zinc-500 font-mono text-[10px]">R$</span>
-                    <input
-                      type="number"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      placeholder="Valor"
-                      className="w-full bg-transparent text-xs font-bold text-white outline-none font-mono"
-                      id="input-withdraw-amount"
-                    />
+                {!user.stripeAccountId ? (
+                  <div className="bg-zinc-900/65 p-4 border border-zinc-800/80 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="bg-violet-600/10 p-2.5 rounded-full text-violet-400">
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                    </div>
+                    <div>
+                      <h5 className="text-[10px] font-extrabold text-white uppercase tracking-wider font-mono">Stripe Connect Recebedor</h5>
+                      <p className="text-[9px] text-zinc-400 mt-1 leading-normal max-w-[220px]">
+                        Vincule seu perfil de criador ao Stripe Connect para receber transferências bancárias em tempo real.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onConnectStripeAccount}
+                      className="w-full py-2 bg-gradient-to-r from-violet-600 to-indigo-650 hover:brightness-110 active:scale-[0.98] text-white font-black text-[10px] rounded-xl transition cursor-pointer"
+                      id="btn-connect-stripe-onboard"
+                    >
+                      Configurar Saques na Stripe
+                    </button>
                   </div>
-                  <input
-                    type="text"
-                    value={stripeAccountId}
-                    onChange={(e) => setStripeAccountId(e.target.value)}
-                    placeholder="Stripe ID (Opcional)"
-                    className="w-full bg-black/65 p-1 px-2.5 rounded-xl border border-zinc-800 text-[10px] text-white outline-none font-mono"
-                    id="input-withdraw-stripe"
-                  />
-                </div>
-                
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={withdrawDestination}
-                    onChange={(e) => setWithdrawDestination(e.target.value)}
-                    placeholder="Chave PIX ou Conta Bancária"
-                    className="flex-1 bg-black/65 p-2 rounded-xl border border-zinc-800 text-[10px] text-white outline-none"
-                    id="input-withdraw-bank"
-                  />
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={handleExecuteWithdrawal}
-                    className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 cursor-pointer transition active:scale-[0.98] disabled:opacity-50"
-                    id="btn-execute-withdrawal"
-                  >
-                    {isProcessing ? "Executando..." : "Sacar"}
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 rounded-xl text-[9px] font-bold text-emerald-400 font-mono">
+                      <span>✓ Stripe Connect Ativo</span>
+                      <span className="opacity-80 font-mono">{user.stripeAccountId}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-1 bg-black/65 p-1 px-2 rounded-xl border border-zinc-800">
+                        <span className="text-zinc-500 font-mono text-[10px]">R$</span>
+                        <input
+                          type="number"
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                          placeholder="Valor"
+                          className="w-full bg-transparent text-xs font-bold text-white outline-none font-mono"
+                          id="input-withdraw-amount"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        disabled
+                        value={stripeAccountId}
+                        placeholder="ID Stripe Connect"
+                        className="w-full bg-zinc-900/60 p-1 px-2.5 rounded-xl border border-zinc-850 text-[10px] text-zinc-550 outline-none font-mono"
+                        id="input-withdraw-stripe"
+                      />
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={withdrawDestination}
+                        onChange={(e) => setWithdrawDestination(e.target.value)}
+                        placeholder="Chave PIX ou Conta Bancária"
+                        className="flex-1 bg-black/65 p-2 rounded-xl border border-zinc-800 text-[10px] text-white outline-none"
+                        id="input-withdraw-bank"
+                      />
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={handleExecuteWithdrawal}
+                        className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 cursor-pointer transition active:scale-[0.98] disabled:opacity-50"
+                        id="btn-execute-withdrawal"
+                      >
+                        {isProcessing ? "Executando..." : "Sacar"}
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

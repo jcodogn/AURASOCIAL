@@ -206,6 +206,59 @@ Gere o resultado no formato JSON estrito contendo o array dos IDs ordenados na c
     }
   });
 
+  // API Route - Create Connected Express Account on Stripe for Payout onboarding
+  app.post("/api/stripe/connect/account", async (req, res) => {
+    const { username, email } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: "Nome de usuário é obrigatório para conectar conta." });
+    }
+
+    try {
+      const stripeKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeKey) {
+        // Safe simulator fallback for onboarding in preview environments
+        const mockAccountId = `acct_sim_${Math.random().toString(36).substring(5)}`;
+        return res.json({
+          id: mockAccountId,
+          url: "SIMULATION_ONBOARDING",
+          message: "Modo simulador ativo. Conta conectada fictícia criada."
+        });
+      }
+
+      // Initialize Stripe safely
+      const stripeLib: any = await import("stripe");
+      const StripeConstructor = stripeLib.default || stripeLib;
+      const stripeInstance = new StripeConstructor(stripeKey, {
+        apiVersion: "2023-10-16" as any
+      });
+
+      const account = await stripeInstance.accounts.create({
+        type: "express",
+        country: "BR",
+        email: email || undefined,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_profile: {
+          url: `https://aurasocial.com/${username}`,
+        }
+      });
+
+      const origin = req.headers.origin || "http://localhost:3000";
+      const accountLink = await stripeInstance.accountLinks.create({
+        account: account.id,
+        refresh_url: `${origin}?stripe_onboarding=refresh&username=${username}`,
+        return_url: `${origin}?stripe_onboarding=success&stripe_account_id=${account.id}`,
+        type: "account_onboarding",
+      });
+
+      res.json({ id: account.id, url: accountLink.url });
+    } catch (err: any) {
+      console.error("Erro ao criar conta conectada Stripe Connect:", err);
+      res.status(500).json({ error: "Falha ao gerar onboarding no Stripe Connect.", details: err?.message });
+    }
+  });
+
   // API Route - Stripe Checkout simulation or live session
   app.post("/api/stripe/checkout", async (req, res) => {
     const { amount, username } = req.body;
@@ -227,7 +280,9 @@ Gere o resultado no formato JSON estrito contendo o array dos IDs ordenados na c
       }
 
       // Initialize Stripe safely
-      const stripeInstance = new (await import("stripe")).default(stripeKey, {
+      const stripeLib: any = await import("stripe");
+      const StripeConstructor = stripeLib.default || stripeLib;
+      const stripeInstance = new StripeConstructor(stripeKey, {
         apiVersion: "2023-10-16" as any
       });
 
@@ -280,7 +335,9 @@ Gere o resultado no formato JSON estrito contendo o array dos IDs ordenados na c
       }
 
       // Initializing Stripe safely
-      const stripeInstance = new (await import("stripe")).default(stripeKey, {
+      const stripeLib: any = await import("stripe");
+      const StripeConstructor = stripeLib.default || stripeLib;
+      const stripeInstance = new StripeConstructor(stripeKey, {
         apiVersion: "2023-10-16" as any
       });
 
