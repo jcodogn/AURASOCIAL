@@ -1,57 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, PhoneCall, Video, Image, Mic, ChevronLeft, Check, CheckCheck, Compass, Search } from "lucide-react";
+import { Send, PhoneCall, Video, Image, Mic, ChevronLeft, Check, CheckCheck, Compass } from "lucide-react";
 import { ChatChannel, Message, User } from "../types";
-import { searchRealUsers, RealUser } from "../lib/supabase";
 
 interface ChatProps {
   channels: ChatChannel[];
   currentUser: User;
   onSendMessage: (channelId: string, text: string) => void;
-  onAddChannel: (usernameOrUser: any) => void;
-  registeredUsers: User[];
+  onAddChannel: (username: string) => void;
 }
 
-export default function Chat({ channels, currentUser, onSendMessage, onAddChannel, registeredUsers }: ChatProps) {
+export default function Chat({ channels, currentUser, onSendMessage, onAddChannel }: ChatProps) {
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const [isTypingSimulated, setIsTypingSimulated] = useState(false);
   const [searchNewContact, setSearchNewContact] = useState("");
-  const [searchResults, setSearchResults] = useState<RealUser[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    if (!searchNewContact.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    const delayDebounce = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const fallbackList: RealUser[] = registeredUsers
-          .filter(u => u.username !== currentUser.username)
-          .map(u => ({
-            id: u.id,
-            username: u.username,
-            displayName: u.displayName || u.username,
-            avatar: u.avatar,
-            isOnline: true,
-            bio: u.bio,
-            isVerified: u.isVerified
-          }));
-
-        const results = await searchRealUsers(searchNewContact, fallbackList);
-        setSearchResults(results);
-      } catch (err) {
-        console.error("Erro consultando Supabase:", err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchNewContact, registeredUsers, currentUser.username]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const handleSend = (e: React.FormEvent, channelId: string) => {
     e.preventDefault();
@@ -89,22 +53,19 @@ export default function Chat({ channels, currentUser, onSendMessage, onAddChanne
 
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
-  const handleSelectContact = (user: RealUser) => {
-    // Add real database user
-    onAddChannel(user);
+  const handleAddChannelClick = () => {
+    if (!searchNewContact.trim()) return;
+    const lower = searchNewContact.toLowerCase().replace("@", "");
+    // Add real channel
+    onAddChannel(lower);
     setSearchNewContact("");
-    setSearchResults([]);
-    
-    // Switch active channel view
+    // Find the channel we just created
     setTimeout(() => {
-      const created = channels.find(c => c.partner.username === user.username);
+      const created = channels.find(c => c.partner.username === lower);
       if (created) {
         setActiveChannelId(created.id);
-      } else {
-        // Fallback guess
-        setActiveChannelId(`chat_${user.id}`);
       }
-    }, 150);
+    }, 100);
   };
 
   return (
@@ -118,92 +79,22 @@ export default function Chat({ channels, currentUser, onSendMessage, onAddChanne
           <h2 className="text-lg font-black text-zinc-900 dark:text-white">Conversas</h2>
 
           {/* Quick new chat creation input */}
-          <div className="relative mt-3 z-30">
-            <div className="flex gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-xl border border-zinc-200/40 items-center">
-              <Search className="w-4 h-4 text-zinc-400 shrink-0 ml-1" />
-              <input
-                type="text"
-                placeholder="Pesquisar usuários no Supabase..."
-                value={searchNewContact}
-                onChange={(e) => setSearchNewContact(e.target.value)}
-                className="flex-1 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 outline-none pl-0.5 font-medium placeholder:text-zinc-400"
-                id="input-create-chat"
-              />
-              {searchNewContact && (
-                <button
-                  type="button"
-                  onClick={() => setSearchNewContact("")}
-                  className="text-[10px] text-zinc-450 hover:text-zinc-900 dark:hover:text-white mr-1"
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
-
-            {/* Supabase realtime results drop panel */}
-            <AnimatePresence>
-              {searchNewContact.trim() !== "" && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  className="absolute left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-805 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto z-50 text-left"
-                >
-                  <div className="px-3.5 py-1.5 bg-violet-600/10 dark:bg-violet-500/5 border-b border-zinc-100 dark:border-zinc-800 text-[9px] font-bold text-violet-600 dark:text-violet-400 font-mono flex items-center justify-between tracking-wide uppercase">
-                    <span>Aura Supabase Link</span>
-                    <span className="animate-pulse text-emerald-500">● Conectado</span>
-                  </div>
-
-                  {isSearching ? (
-                    <div className="p-4 text-center text-xs text-zinc-400 font-medium flex items-center justify-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-violet-500 rounded-full animate-bounce" />
-                      <div className="w-1.5 h-1.5 bg-violet-500 font-bold" />
-                      Consultando banco de dados...
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-zinc-400 font-medium">
-                      Nenhum perfil real localizado
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-zinc-50 dark:divide-zinc-850">
-                      {searchResults.map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => handleSelectContact(user)}
-                          className="w-full px-3.5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center gap-3 transition text-left cursor-pointer active:bg-zinc-100"
-                        >
-                          <img
-                            src={user.avatar}
-                            alt={user.displayName}
-                            referrerPolicy="no-referrer"
-                            className="w-8 h-8 rounded-full object-cover border border-zinc-100 dark:border-zinc-800 shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                                {user.displayName}
-                              </span>
-                              {user.isVerified && (
-                                <span className="w-3 h-3 bg-blue-500 text-white rounded-full flex items-center justify-center text-[7px] font-extrabold shrink-0">
-                                  ✓
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[9px] text-zinc-500 font-mono block">
-                              @{user.username}
-                            </span>
-                          </div>
-                          <div className="text-[9px] text-violet-500 font-extrabold bg-violet-500/10 px-2 py-1 rounded-lg shrink-0">
-                            Chat
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <div className="mt-3 flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/40">
+            <input
+              type="text"
+              placeholder="@username..."
+              value={searchNewContact}
+              onChange={(e) => setSearchNewContact(e.target.value)}
+              className="flex-1 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 outline-none pl-2.5 font-medium"
+              id="input-create-chat"
+            />
+            <button
+              onClick={handleAddChannelClick}
+              className="bg-violet-600 hover:bg-violet-500 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition"
+              id="btn-create-chat"
+            >
+              Iniciar
+            </button>
           </div>
         </div>
 
